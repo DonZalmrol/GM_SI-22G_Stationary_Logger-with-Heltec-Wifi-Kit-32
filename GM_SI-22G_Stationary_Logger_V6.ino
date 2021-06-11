@@ -11,6 +11,8 @@
 
 int increaseSecCount = 1;
 
+float temperature = 0.0, humidity = 0.0, pressure = 0.0, tubeVoltage = 0.0;
+
 unsigned long cps_1 = 0, cps_2 = 0;
 unsigned long actual_cps_1 = 0, actual_cps_2 = 0;
 unsigned long cpm = 0, cpm_temp = 0;
@@ -25,6 +27,8 @@ DHTesp dht;
 
 boolean event1 = false, event2 = false;
 boolean buttonShowLCD = false;
+
+time_t epoch = 0;
 
 // Tube dead time in seconds
 // SI-22G = 0.000xxx seconds
@@ -180,9 +184,18 @@ void loop()
   
   // If 61 seconds have been reached do upload and reset vars
   if (((millis() - previousMillis_2) >= 61000UL) && (increaseSecCount >= 61))
-  {  
+  {
+    // Fetch values
     cpm = cps_sensor.getAvg();
     cpm_temp = cpm;
+    
+    temperature = dht.getTemperature();
+    humidity = dht.getHumidity();
+    pressure = 0.0;
+    tubeVoltage = displayTubeVoltage();
+
+    // Get current time as UNIX time
+    epoch = pftime::time(nullptr);
 
     // Print new line
     Serial.println(F("\n"));
@@ -343,7 +356,9 @@ void uploadTaskFunction( void * parameter)
   connecToURadMonLogger();
 
   // Reset variables
+  epoch = 0;
   cpm_temp = 0;
+  temperature = 0.0, humidity = 0.0, pressure = 0.0, tubeVoltage = 0.0;
 
   esp_task_wdt_delete(NULL);
 
@@ -411,25 +426,22 @@ void connecToURadMonLogger()
   HttpClient client = HttpClient(wifi, "data.uradmonitor.com", 80);
 
   Serial.println(F("Connection to uradmonitoring platform succeeded!"));
-
-  // Get current time as UNIX time
-  time_t epoch = pftime::time(nullptr);
-
+  
   // Concat data for POST
   // Basic API URL (doesn't change)
   String ptr = "/api/v1/upload/exp";
   ptr += "/01/";                // compulsory: local time in seconds
   ptr += epoch;                 // time epoch value
   ptr += "/02/";                // 02 = optional: temperature in degrees celsius
-  ptr += dht.getTemperature();  // temperature value 
+  ptr += temperature;           // temperature value 
   ptr += "/03/";                // 03 = optional: barometric pressure in pascals
-  ptr += "0";                   // barometric value
+  ptr += pressure;              // barometric value
   ptr += "/04/";                // 04 = optional: humidity as relative humidity in percentage %
-  ptr += dht.getHumidity();     // humidity value
+  ptr += humidity;              // humidity value
   ptr += "/0B/";                // 0B = optional: radiation measured on geiger tube in cpm
   ptr += cpm_temp;              // a-cpm value
   ptr += "/0C/";                // 0C = optional: high voltage geiger tube inverter voltage in volts
-  ptr += displayTubeVoltage();  // tube voltage value
+  ptr += tubeVoltage;           // tube voltage value
   ptr += "/0E/106/0F/123";      // 0F : 123 = ver_sw : value | 0E : 106 = ver_hw : value
   ptr += "/10/6";               // 10 = Tube ID | 6 (0x6) = GEIGER_TUBE_SI22G
   
