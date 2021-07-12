@@ -17,7 +17,7 @@ unsigned long cps_1 = 0, cps_2 = 0;
 unsigned long actual_cps_1 = 0, actual_cps_2 = 0;
 unsigned long cpm = 0, cpm_temp = 0;
 unsigned long sensorMovingAvg = 0;
-unsigned long previousMillis_1 = 0, previousMillis_2 = 0;
+unsigned long previousMillis_1 = 0, previousMillis_2 = 0, previousMillis_3 = 0;
 
 // Set sensor to 120 data points for moving average (2x 60 second data entry points)
 movingAvg cps_sensor(120);
@@ -236,6 +236,18 @@ void loop()
 
     previousMillis_1 = millis();
     previousMillis_2 = millis();
+  }
+
+  // if WiFi is down, try reconnecting every CHECK_WIFI_TIME seconds
+  if ((WiFi.status() != WL_CONNECTED) && (millis() - previousMillis_3 >= 30000))
+  {
+    //Serial.print(millis());
+    //Serial.println("Reconnecting to WiFi...");
+    
+    WiFi.disconnect();
+    WiFi.reconnect();
+    
+    previousMillis_3 = millis();
   }
 }
 
